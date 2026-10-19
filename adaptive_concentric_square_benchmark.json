@@ -1,0 +1,19 @@
+{
+  "trials_total": 500,
+  "trials_detected": 500,
+  "detection_success_rate_pct": 100.0,
+  "localization_success_rate_pct": 100.0,
+  "mean_mission_time_h": 1.5921532161681764,
+  "median_mission_time_h": 1.2434485229507024,
+  "p90_mission_time_h": 3.4094971347017147,
+  "p95_mission_time_h": 3.7954552052555295,
+  "max_mission_time_h": 4.036121579659296,
+  "mean_search_time_h": 1.5365976606126208,
+  "mean_localization_error_m": 1.8200738173451962,
+  "max_localization_error_m": 4.032660652497618,
+  "mean_battery_swaps": 0,
+  "max_battery_swaps": 0,
+  "mean_energy_wh": 84.38412045691334,
+  "max_energy_wh": 213.91444372194266,
+  "pct_completed_within_5h": 100.0
+}

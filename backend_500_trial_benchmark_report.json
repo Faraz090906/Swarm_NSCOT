@@ -1,0 +1,17 @@
+{
+  "total_trials": 500,
+  "detected_trials": 496,
+  "detection_success_rate_pct": 99.2,
+  "mean_mission_time_h": 2.5401344086021505,
+  "median_mission_time_h": 2.881111111111111,
+  "p90_mission_time_h": 3.8613888888888885,
+  "p95_mission_time_h": 3.9756944444444446,
+  "max_mission_time_h": 4.153333333333333,
+  "mean_battery_swaps": 0.064,
+  "max_battery_swaps": 8,
+  "mean_energy_wh": 535.8663347159719,
+  "max_energy_wh": 880.4809027823645,
+  "pct_completed_within_5h": 100.0,
+  "total_benchmark_real_duration_s": 1809.7056078910828,
+  "mean_real_execution_time_per_trial_ms": 3619.1916670799255
+}

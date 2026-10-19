@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ASV Swarm Simulation Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap');
+  :root { --bg: #0a0f1a; --surface: #0f1724; --panel: #131e2e; --border: #1e2d42; --accent: #00d4ff; --green: #00ff9d; --amber: #ffb830; --red: #ff4d6a; --text: #e2eaf4; --muted: #5a7a96; --water1: #0d2137; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 0 20px; height: 50px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .logo { font-family: 'JetBrains Mono'; font-size: 14px; color: var(--accent); font-weight: bold; }
+  .stats { display: flex; gap: 20px; font-family: 'JetBrains Mono'; font-size: 12px; }
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .panel { width: 340px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; padding: 10px; }
+  .canvas-wrap { flex: 1; background: var(--water1); position: relative; display: flex; justify-content: center; align-items: center; }
+  canvas { background: #071424; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
+  .boat-card { background: var(--surface); padding: 12px; margin-bottom: 8px; border-radius: 4px; border: 1px solid var(--border); font-family: 'JetBrains Mono'; font-size: 11px; }
+  .batt-bar { height: 6px; background: var(--border); margin-top: 6px; border-radius: 3px; overflow: hidden; }
+  .batt-fill { height: 100%; background: var(--green); transition: width 0.2s, background-color 0.2s; }
+  .batt-fill.low { background: var(--red); }
+  .btn { padding: 6px 12px; font-family: 'JetBrains Mono'; cursor: pointer; background: rgba(0,212,255,0.1); border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; }
+  .btn:hover { background: rgba(0,212,255,0.2); }
+  .btn.rand { border-color: var(--amber); color: var(--amber); background: rgba(255,184,48,0.1); }
+  .btn.rand:hover { background: rgba(255,184,48,0.2); }
+  .state-badge { padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.1); font-size: 10px; }
+  .overlay-msg { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,255,157,0.15); color: var(--green); padding: 10px 20px; border: 1px solid var(--green); font-family: 'JetBrains Mono'; display: none; border-radius: 4px;}
+  .battery-text { font-size: 10px; font-weight: bold; margin-top: 4px; text-align: right; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">NIOT ADAPTIVE SWARM AI</div>
+  <div class="stats">
+    <div>Mission Clock: <span id="lbl-time" style="color:var(--green)">00:00:00</span></div>
+    <div>Area Scanned: <span id="lbl-cov" style="color:var(--accent)">0.0%</span></div>
+    <div style="color:var(--muted)">P_draw: 53 W | Cap: 296 Wh</div>
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <button class="btn" id="btn-start">EXECUTE</button>
+    <button class="btn rand" id="btn-random">🎲 RANDOMIZE TARGET</button>
+    <button class="btn" id="btn-reset">RESET</button>
+  </div>
+</header>
+<div class="main">
+  <div class="canvas-wrap" id="canvas-container">
+    <canvas id="lake"></canvas>
+    <div id="found-msg" class="overlay-msg">TARGET LOCALIZED & CONFIRMED</div>
+  </div>
+  <div class="panel" id="telemetry-feed"></div>
+</div>
+<script>
+  const canvas = document.getElementById('lake'), ctx = canvas.getContext('2d');
+  let scale = 1.0;
+  function resize() {
+    const dim = Math.min(canvas.parentElement.clientWidth, canvas.parentElement.clientHeight) - 32;
+    canvas.width = canvas.height = dim;
+    scale = dim / 1000.0;
+  }
+  window.addEventListener('resize', resize); resize();
+  
+  function formatTime(secs) {
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = Math.floor(secs % 60);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function draw(data) {
+    ctx.clearRect(0,0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.08)';
+    data.cells.forEach(([cx, cy]) => {
+      ctx.fillRect(cx * 25 * scale, canvas.height - (cy + 1) * 25 * scale, 25 * scale, 25 * scale);
+    });
+
+    const gs_size = 15;
+    ctx.fillStyle = '#ffb830';
+    ctx.fillRect(0, canvas.height - gs_size, gs_size, gs_size);
+    ctx.fillStyle = '#000'; ctx.font = '9px Arial'; ctx.fillText('GS', 1, canvas.height - 4);
+
+    const [tx, ty] = [data.target.x * scale, canvas.height - data.target.y * scale];
+    ctx.fillStyle = data.target.found ? '#00ff9d' : 'rgba(255, 77, 106, 0.3)';
+    ctx.beginPath(); ctx.arc(tx, ty, 6, 0, Math.PI*2); ctx.fill();
+
+    let html = '';
+    data.boats.forEach(b => {
+      const [bx, by] = [b.x * scale, canvas.height - b.y * scale];
+      
+      ctx.fillStyle = (b.state === 'returning' || b.state === 'swapping' || b.state === 'repositioning') ? '#ff4d6a' : 
+                      (b.state === 'investigate' ? '#ffb830' : (b.state === 'found' ? '#00ff9d' : '#00d4ff'));
+      ctx.beginPath(); ctx.arc(bx, by, 4, 0, Math.PI*2); ctx.fill();
+      
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '10px JetBrains Mono';
+      ctx.fillText(`ASV-${b.id+1}`, bx + 6, by - 6);
+
+      const isLow = b.battery_pct < 20;
+      const battColor = isLow ? 'var(--red)' : 'var(--green)';
+      const rtbMsg = isLow ? ' (RTB TRIGGERED)' : '';
+      
+      html += `<div class="boat-card">
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <b style="color:${b.state==='found'?'var(--green)':'var(--text)'}">ASV-${b.id+1}</b> 
+          <span class="state-badge">${b.state.toUpperCase()}</span>
+        </div>
+        <div style="color:var(--muted)">Pos: ${b.x.toFixed(0)}m, ${b.y.toFixed(0)}m | Swaps: ${b.swaps}</div>
+        <div style="color:var(--muted)">Score (S_t): ${b.anomaly_score.toFixed(2)} | B_t: ${b.mag_reading.toFixed(1)} nT</div>
+        <div class="batt-bar">
+          <div class="batt-fill ${isLow ? 'low' : ''}" style="width:${b.battery_pct}%"></div>
+        </div>
+        <div class="battery-text" style="color: ${battColor}">
+          BATTERY: ${b.battery_pct.toFixed(1)}%${rtbMsg}
+        </div>
+      </div>`;
+    });
+    
+    document.getElementById('lbl-time').innerText = formatTime(data.virtual_time);
+    document.getElementById('lbl-cov').innerText = data.coverage_pct.toFixed(1) + '%';
+    document.getElementById('telemetry-feed').innerHTML = html;
+    document.getElementById('found-msg').style.display = data.target.found ? 'block' : 'none';
+  }
+
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/telemetry');
+      draw(await res.json());
+    } catch(e) {}
+  }, 50);
+
+  document.getElementById('btn-start').onclick = () => fetch('/api/state', {method:'POST', body: JSON.stringify({running:true})});
+  document.getElementById('btn-reset').onclick = () => fetch('/api/reset', {method:'POST'});
+  document.getElementById('btn-random').onclick = () => {
+      const rx = 100 + Math.random() * 800;
+      const ry = 100 + Math.random() * 800;
+      fetch('/api/target', {method:'POST', body: JSON.stringify({x: rx, y: ry})});
+  };
+</script>
+</body>
+</html>
